@@ -14,13 +14,14 @@ Flow (server-authoritative outcomes, external-authoritative balances):
 import json
 
 from django.conf import settings
+from django.db.models import Sum
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
 from . import config as gconf
 from . import rng
-from .external import ExternalError, charge, credit, get_balance
+from .external import ExternalError, charge, credit, get_balance, get_wallets
 from .models import PlayerSeed, Round
 
 
@@ -29,6 +30,14 @@ from .models import PlayerSeed, Round
 # --------------------------------------------------------------------------
 def _err(message, status=400, **extra):
     return JsonResponse({"error": message, **extra}, status=status)
+
+
+def _cumulative_won(user_id):
+    """Total winnings ever banked by this user — in tokens and in naira (pot / rate)."""
+    total_tokens = Round.objects.filter(user_id=user_id, status=Round.BANKED).aggregate(
+        s=Sum("pot"))["s"] or 0
+    rate = settings.TOKENS_PER_NAIRA or 4
+    return {"tokens": int(total_tokens), "naira": round(total_tokens / rate, 2)}
 
 
 def _body(request):
@@ -92,14 +101,19 @@ def session(request):
 
     seed = _get_seed(user_id, data.get("clientSeed"))
     try:
-        balance = get_balance(user_id, token=request.headers.get("X-Session-Token"))
+        wallets = get_wallets(user_id, token=request.headers.get("X-Session-Token"))
     except ExternalError as exc:
         return _err(f"balance backend error: {exc}", 502)
+    won = _cumulative_won(user_id)
 
     return JsonResponse({
         "userId": user_id,
-        "balance": balance,
+        "balance": wallets["tokens"],        # token (CRD) balance — what bets are drawn from
+        "walletBalance": wallets["wallet"],  # naira wallet — where winnings are paid
         "currency": gconf.CURRENCY,
+        "tokensPerNaira": settings.TOKENS_PER_NAIRA,
+        "totalWonTokens": won["tokens"],
+        "totalWonNaira": won["naira"],
         "serverSeedHash": seed.server_seed_hash,
         "clientSeed": seed.client_seed,
         "nonce": seed.nonce,
@@ -258,24 +272,34 @@ def bank(request):
     if rnd.status != Round.ACTIVE:
         return _err("round not active", 409, status=rnd.status)
 
-    amount = rnd.pot
+    amount = rnd.pot  # pot in tokens — the win for this round
     token = request.headers.get("X-Session-Token")
-    balance = None
+    result = {"naira_credited": None, "wallet": None, "tokens": None}
     if amount > 0:
         try:
-            balance = credit(rnd.user_id, amount, f"neon{rnd.id.hex}w", token=token)
+            result = credit(rnd.user_id, amount, f"neon{rnd.id.hex}w", token=token)
         except ExternalError as exc:
             return _err(f"credit failed: {exc}", 502)
     else:
         try:
-            balance = get_balance(rnd.user_id, token=token)
+            w = get_wallets(rnd.user_id, token=token)
+            result = {"naira_credited": 0, "wallet": w["wallet"], "tokens": w["tokens"]}
         except ExternalError:
-            balance = None
+            pass
 
     rnd.status = Round.BANKED
     rnd.save(update_fields=["status", "updated_at"])
+    won = _cumulative_won(rnd.user_id)
 
-    return JsonResponse({"roundId": str(rnd.id), "amount": amount, "balance": balance})
+    return JsonResponse({
+        "roundId": str(rnd.id),
+        "amount": amount,                       # tokens won this round (the pot)
+        "balance": result["tokens"],            # token balance (a win pays naira, so this is unchanged live)
+        "walletBalance": result["wallet"],      # naira wallet — where the win landed
+        "nairaCredited": result["naira_credited"],
+        "totalWonTokens": won["tokens"],
+        "totalWonNaira": won["naira"],
+    })
 
 
 # --------------------------------------------------------------------------

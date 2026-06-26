@@ -96,6 +96,10 @@ EXTERNAL_CREDIT_PATH = os.environ.get("EXTERNAL_CREDIT_PATH", "/payment/other-ga
 EXTERNAL_BALANCE_PATH = os.environ.get("EXTERNAL_BALANCE_PATH", "")
 EXTERNAL_BALANCE_FIELD = os.environ.get("EXTERNAL_BALANCE_FIELD", "balance")
 
+# Bets debit the TOKENS balance; wins are credited to the NAIRA wallet.
+# Conversion: 1 naira = TOKENS_PER_NAIRA tokens, so a pot of N tokens pays N/rate naira.
+TOKENS_PER_NAIRA = float(os.environ.get("TOKENS_PER_NAIRA", "4"))
+
 # Optional shared secret: require this token (X-Session-Token header) on play
 # endpoints. Leave blank to disable (NOT recommended for production).
 SESSION_SHARED_SECRET = os.environ.get("SESSION_SHARED_SECRET", "")

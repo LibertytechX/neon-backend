@@ -77,7 +77,8 @@ def _coerce_user(user_id):
 
 def _post(path, user_id, amount, ref):
     url = settings.EXTERNAL_BASE_URL.rstrip("/") + path
-    payload = {"user_id": _coerce_user(user_id), "amount": int(amount), "unique_reference": ref}
+    # amount may be an int (tokens, for a charge) or a float (naira, for a credit)
+    payload = {"user_id": _coerce_user(user_id), "amount": amount, "unique_reference": ref}
     try:
         r = requests.post(url, json=payload, headers=_headers(), timeout=settings.EXTERNAL_TIMEOUT)
     except requests.RequestException as exc:
@@ -111,39 +112,72 @@ def _dig(obj, dotpath):
     return obj
 
 
-def get_balance(user_id, token=None):
-    """Read the player's token balance from hustleback. Returns None if no endpoint configured."""
-    if settings.MOCK_EXTERNAL:
-        return _mock_get(user_id)
-    if not settings.EXTERNAL_BALANCE_PATH:
-        return None
+def _num(raw, cast=float):
+    return cast(float(raw)) if raw is not None else None
+
+
+def _fetch_wallet_data(user_id):
+    """GET the player's wallet payload from hustleback; returns the `data` dict (or {})."""
     url = settings.EXTERNAL_BASE_URL.rstrip("/") + settings.EXTERNAL_BALANCE_PATH
     try:
         r = requests.get(url, params={"user_id": _coerce_user(user_id)}, headers=_headers(),
                          timeout=settings.EXTERNAL_TIMEOUT)
         r.raise_for_status()
         body = r.json()
-        data = body.get("data") or body
-        raw = _dig(data, settings.EXTERNAL_BALANCE_FIELD) if settings.EXTERNAL_BALANCE_FIELD else data.get("balance")
-        return int(float(raw)) if raw is not None else None
-    except (requests.RequestException, KeyError, ValueError, TypeError) as exc:
-        logger.exception("external get_balance failed")
+        return body.get("data") or body
+    except (requests.RequestException, ValueError, TypeError) as exc:
+        logger.exception("external wallet read failed")
         raise ExternalError(str(exc))
 
 
+def get_balance(user_id, token=None):
+    """Read the player's TOKEN balance (used for bet affordability). None if no endpoint."""
+    if settings.MOCK_EXTERNAL:
+        return _mock_get(user_id)
+    if not settings.EXTERNAL_BALANCE_PATH:
+        return None
+    data = _fetch_wallet_data(user_id)
+    field = settings.EXTERNAL_BALANCE_FIELD or "balance"
+    return _num(_dig(data, field), int)
+
+
+def get_wallets(user_id, token=None):
+    """Return both balances for display: {'tokens': int, 'wallet': float} (naira wallet)."""
+    if settings.MOCK_EXTERNAL:
+        b = _mock_get(user_id)
+        return {"tokens": b, "wallet": None}
+    if not settings.EXTERNAL_BALANCE_PATH:
+        return {"tokens": None, "wallet": None}
+    data = _fetch_wallet_data(user_id)
+    return {
+        "tokens": _num(_dig(data, "tokens.actual_balance"), int),
+        "wallet": _num(_dig(data, "wallet.actual_balance"), float),
+    }
+
+
 def charge(user_id, amount, ref, token=None):
-    """Debit a bet. Raises ExternalError if declined (e.g. insufficient funds)."""
+    """Debit a bet from the TOKEN balance. Raises ExternalError if declined."""
     if settings.MOCK_EXTERNAL:
         _mock_move(user_id, -int(amount))
         return True
-    _post(settings.EXTERNAL_CHARGE_PATH, user_id, amount, ref)
+    _post(settings.EXTERNAL_CHARGE_PATH, user_id, int(amount), ref)
     return True
 
 
-def credit(user_id, amount, ref, token=None):
-    """Credit a win. Returns the new balance (balance_after) when provided."""
+def credit(user_id, amount_tokens, ref, token=None):
+    """Credit a win to the player's NAIRA wallet (pot tokens -> naira at 1:TOKENS_PER_NAIRA).
+
+    Returns {'naira_credited', 'wallet', 'tokens'} — post-credit balances from hustleback
+    (wallet/tokens are None in mock mode, where the win is added to the single mock balance).
+    """
     if settings.MOCK_EXTERNAL:
-        return _mock_move(user_id, int(amount))
-    data = _post(settings.EXTERNAL_CREDIT_PATH, user_id, amount, ref)
-    bal = data.get("balance_after")
-    return int(bal) if bal is not None else None
+        new_bal = _mock_move(user_id, int(amount_tokens))
+        return {"naira_credited": None, "wallet": None, "tokens": new_bal}
+    rate = settings.TOKENS_PER_NAIRA or 4
+    naira = round(float(amount_tokens) / rate, 2)
+    data = _post(settings.EXTERNAL_CREDIT_PATH, user_id, naira, ref)
+    return {
+        "naira_credited": naira,
+        "wallet": _num(_dig(data, "wallet.actual_balance"), float),
+        "tokens": _num(_dig(data, "tokens.actual_balance"), int),
+    }
