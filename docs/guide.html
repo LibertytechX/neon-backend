@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEON RUSH — Integration Guide</title>
+<style>
+  :root{
+    --neon:#0ff7ff; --pink:#ff2bd6; --gold:#ffd84d; --green:#39ff9c; --red:#ff6b81;
+    --bg:#070014; --panel:#0f0428; --panel2:#160a36; --line:rgba(255,255,255,.09);
+    --ink:#eef2ff; --muted:#9aa6c6; --code:#0a0420;
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  html{scroll-behavior:smooth}
+  body{font-family:"Segoe UI",system-ui,-apple-system,sans-serif; color:var(--ink); line-height:1.6;
+    background:radial-gradient(70% 50% at 85% 0%, rgba(255,43,214,.12), transparent 60%),
+               radial-gradient(60% 50% at 0% 5%, rgba(0,247,255,.1), transparent 55%),
+               var(--bg);}
+  a{color:var(--neon); text-decoration:none} a:hover{text-decoration:underline}
+  .layout{display:grid; grid-template-columns:230px 1fr; max-width:1180px; margin:0 auto; gap:0}
+  @media(max-width:900px){ .layout{grid-template-columns:1fr} aside{display:none} }
+
+  /* sidebar */
+  aside{position:sticky; top:0; align-self:start; height:100vh; overflow:auto; padding:26px 18px; border-right:1px solid var(--line)}
+  .brand{display:flex; align-items:center; gap:10px; font-weight:800; font-size:17px; margin-bottom:6px}
+  .brand .dot{width:24px; height:24px; border-radius:7px; background:conic-gradient(from 210deg,var(--neon),var(--pink),var(--gold),var(--neon)); box-shadow:0 0 16px rgba(0,247,255,.5)}
+  .ver{display:inline-block; font-size:11px; color:var(--green); border:1px solid rgba(57,255,156,.4); background:rgba(57,255,156,.08); padding:2px 8px; border-radius:20px; margin:8px 0 18px}
+  nav.toc a{display:block; color:var(--muted); font-size:14px; padding:6px 10px; border-radius:8px}
+  nav.toc a:hover{color:var(--ink); background:rgba(255,255,255,.04); text-decoration:none}
+  nav.toc .sec{font-size:11px; letter-spacing:1.5px; text-transform:uppercase; color:#6b7699; margin:16px 10px 4px}
+
+  /* content */
+  main{padding:42px clamp(20px,4vw,56px) 90px; max-width:880px}
+  h1{font-size:clamp(30px,4.5vw,42px); font-weight:900; letter-spacing:-.5px; line-height:1.1; margin-bottom:10px}
+  h1 .g{background:linear-gradient(90deg,var(--neon),var(--pink),var(--gold)); -webkit-background-clip:text; background-clip:text; color:transparent}
+  .lead{font-size:17px; color:var(--muted); margin-bottom:14px}
+  h2{font-size:23px; font-weight:800; margin:46px 0 14px; padding-top:14px; scroll-margin-top:20px}
+  h2::before{content:""; display:block; height:1px; background:var(--line); margin-bottom:22px}
+  h3{font-size:16px; font-weight:700; margin:24px 0 8px; color:#dfe6ff}
+  p{margin:10px 0; color:#cdd5ef}
+  ul{margin:10px 0 10px 22px; color:#cdd5ef} li{margin:5px 0}
+  .muted{color:var(--muted)} b{color:#fff}
+
+  .callout{border:1px solid var(--line); border-left:3px solid var(--neon); background:rgba(0,247,255,.05); padding:12px 16px; border-radius:10px; margin:16px 0; font-size:14.5px}
+  .callout.warn{border-left-color:var(--gold); background:rgba(255,216,77,.06)}
+  .callout.danger{border-left-color:var(--red); background:rgba(255,107,129,.06)}
+  .callout b{color:#fff}
+
+  /* code */
+  .code{position:relative; margin:14px 0; border-radius:12px; border:1px solid var(--line); background:var(--code); overflow:hidden}
+  .code .bar{display:flex; align-items:center; justify-content:space-between; padding:7px 12px; border-bottom:1px solid var(--line); background:rgba(255,255,255,.02)}
+  .code .lang{font:11px monospace; color:var(--muted); letter-spacing:1px}
+  .code .copy{font:11px/1 system-ui; color:var(--neon); background:rgba(0,247,255,.1); border:1px solid rgba(0,247,255,.35); border-radius:7px; padding:5px 10px; cursor:pointer}
+  .code .copy:hover{background:rgba(0,247,255,.2)} .code .copy.ok{color:var(--green); border-color:var(--green); background:rgba(57,255,156,.12)}
+  pre{margin:0; padding:14px 16px; overflow:auto; font:13px/1.65 "SF Mono",Menlo,Consolas,monospace; color:#d6e2ff}
+  code.inline{font:12.5px monospace; background:rgba(255,255,255,.07); padding:1px 6px; border-radius:5px; color:#aef}
+  .tok-tag{color:#ff8fe0} .tok-attr{color:var(--gold)} .tok-str{color:#9affc4} .tok-kw{color:#7cc0ff} .tok-com{color:#6b7699} .tok-fn{color:#ffd98a}
+
+  /* tables */
+  table{width:100%; border-collapse:collapse; margin:14px 0; font-size:14px}
+  th,td{text-align:left; padding:10px 12px; border-bottom:1px solid var(--line); vertical-align:top}
+  th{color:var(--muted); font-weight:600; font-size:12px; letter-spacing:.5px; text-transform:uppercase}
+  td code{font:12px monospace; color:#aef}
+
+  .demo{border:1px solid var(--line); border-radius:16px; padding:18px; background:linear-gradient(160deg,var(--panel),var(--panel2)); margin:16px 0}
+  .demo .tag{font:11px monospace; color:var(--muted); margin-bottom:10px}
+  .pillrow{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px}
+  .pill{font-size:12px; padding:5px 11px; border-radius:20px; border:1px solid var(--line); color:var(--muted); cursor:pointer}
+  .pill:hover{color:var(--ink); border-color:var(--neon)}
+  footer{border-top:1px solid var(--line); margin-top:50px; padding-top:20px; color:var(--muted); font-size:13px}
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside>
+    <div class="brand"><span class="dot"></span> NEON RUSH</div>
+    <span class="ver">&lt;neon-slot&gt; · v1</span>
+    <nav class="toc">
+      <a href="#start">Quick start</a>
+      <div class="sec">Demo</div>
+      <a href="#demo">Live demo</a>
+      <div class="sec">Reference</div>
+      <a href="#attributes">Attributes</a>
+      <a href="#api">JS API</a>
+      <a href="#events">Events</a>
+      <a href="#backend">Server outcomes</a>
+      <a href="#config">Configuration</a>
+      <a href="#theming">Theming &amp; sizing</a>
+      <div class="sec">Go live</div>
+      <a href="#golive">Initialize a player</a>
+      <a href="#endpoints">API endpoints</a>
+      <a href="#money">Tokens &amp; payouts</a>
+      <div class="sec">Frameworks</div>
+      <a href="#react">React</a>
+      <a href="#vue">Vue</a>
+      <div class="sec">Ops</div>
+      <a href="#updates">Updates &amp; versions</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+  </aside>
+
+  <!-- CONTENT -->
+  <main>
+    <h1>Embed the <span class="g">NEON RUSH</span> slot</h1>
+    <p class="lead">A neon slot-machine game you drop into any web page with two lines. It's a standard
+    Web Component — works in plain HTML, React, Vue, WordPress, Webflow — and its styles are fully isolated
+    (Shadow DOM), so it can't clash with your site.</p>
+
+    <!-- QUICK START -->
+    <h2 id="start">Quick start</h2>
+    <p>Add the script once, then place the element wherever you want the game. That's a fully playable slot.</p>
+    <div class="code">
+      <div class="bar"><span class="lang">HTML</span><button class="copy">Copy</button></div>
+<pre><span class="tok-com">&lt;!-- load the component from the CDN (auto-updates within v1) --&gt;</span>
+<span class="tok-tag">&lt;script</span> <span class="tok-attr">src</span>=<span class="tok-str">"https://cdn.jsdelivr.net/gh/dtekluva/neon2@v1/neon-slot.js"</span><span class="tok-tag">&gt;&lt;/script&gt;</span>
+
+<span class="tok-tag">&lt;neon-slot</span> <span class="tok-attr">balance</span>=<span class="tok-str">"1000"</span> <span class="tok-attr">bet</span>=<span class="tok-str">"25"</span> <span class="tok-attr">currency</span>=<span class="tok-str">"CRD"</span><span class="tok-tag">&gt;&lt;/neon-slot&gt;</span></pre>
+    </div>
+    <div class="callout">No build step, no npm, no dependencies. For the 3D engine add <code class="inline">engine="3d"</code> — Three.js loads itself from the same CDN automatically.</div>
+
+    <!-- LIVE DEMO -->
+    <h2 id="demo">Live demo</h2>
+    <p>This is the real component, loaded from the CDN right here on this page:</p>
+    <div class="demo">
+      <div class="pillrow">
+        <span class="pill" onclick="demo().setAttribute('engine','stylized')">engine: stylized</span>
+        <span class="pill" onclick="demo().setAttribute('engine','3d')">engine: 3d</span>
+        <span class="pill" onclick="demo().setBalance(1000)">refill balance</span>
+      </div>
+      <neon-slot id="demoSlot" balance="1000" bet="25" currency="CRD"></neon-slot>
+    </div>
+
+    <!-- ATTRIBUTES -->
+    <h2 id="attributes">Attributes</h2>
+    <table>
+      <tr><th>Attribute</th><th>Default</th><th>Description</th></tr>
+      <tr><td><code>engine</code></td><td><code>stylized</code></td><td><code>stylized</code> (zero-dependency) or <code>3d</code> (WebGL via Three.js)</td></tr>
+      <tr><td><code>balance</code></td><td><code>1000</code></td><td>Starting balance shown in the HUD</td></tr>
+      <tr><td><code>bet</code></td><td><code>25</code></td><td>Starting bet — must be one of the configured tiers (10/25/50/100)</td></tr>
+      <tr><td><code>currency</code></td><td><code>CREDITS</code></td><td>Currency label (e.g. <code>CRD</code>, <code>USDC</code>)</td></tr>
+      <tr><td><code>muted</code></td><td><span class="muted">off</span></td><td>Add the attribute to disable sound</td></tr>
+      <tr><td><code>three-src</code></td><td><span class="muted">auto</span></td><td>Override where Three.js loads from (defaults to the same CDN path)</td></tr>
+    </table>
+
+    <!-- API -->
+    <h2 id="api">JavaScript API</h2>
+    <p>Grab the element and call methods / set properties:</p>
+    <div class="code">
+      <div class="bar"><span class="lang">JS</span><button class="copy">Copy</button></div>
+<pre><span class="tok-kw">const</span> slot = document.<span class="tok-fn">querySelector</span>(<span class="tok-str">'neon-slot'</span>);
+
+slot.balance         <span class="tok-com">// get / set the balance (number)</span>
+slot.bet             <span class="tok-com">// get / set the current bet</span>
+slot.spinning        <span class="tok-com">// read-only boolean</span>
+
+slot.<span class="tok-fn">spin</span>();          <span class="tok-com">// trigger a spin programmatically</span>
+slot.<span class="tok-fn">setBet</span>(<span class="tok-str">50</span>);     <span class="tok-com">// change bet (must be a tier)</span>
+slot.<span class="tok-fn">setBalance</span>(<span class="tok-str">1000</span>);<span class="tok-com">// set balance + emit balancechange</span>
+slot.<span class="tok-fn">reset</span>();         <span class="tok-com">// clear spin/gamble state</span>
+
+slot.config = { <span class="tok-com">/* symbols, payouts, betTiers… (see Configuration) */</span> };</pre>
+    </div>
+
+    <!-- EVENTS -->
+    <h2 id="events">Events</h2>
+    <p>All events bubble and cross the Shadow DOM boundary. Read <code class="inline">event.detail</code>:</p>
+    <table>
+      <tr><th>Event</th><th>detail</th><th>When</th></tr>
+      <tr><td><code>spinstart</code></td><td><code>{ bet, balance }</code></td><td>a spin begins</td></tr>
+      <tr><td><code>result</code></td><td><code>{ reels, count, symbol, win }</code></td><td>reels stopped</td></tr>
+      <tr><td><code>win</code></td><td><code>{ amount, count, symbol }</code></td><td>a winning line</td></tr>
+      <tr><td><code>phasechange</code></td><td><code>{ phase, pot }</code></td><td>climbed the phase ladder</td></tr>
+      <tr><td><code>risk</code></td><td><code>{ won, phase, pot }</code></td><td>a RISK gamble resolved</td></tr>
+      <tr><td><code>bank</code></td><td><code>{ amount }</code></td><td><b>player kept winnings</b> — credit the wallet here</td></tr>
+      <tr><td><code>bust</code></td><td><code>{}</code></td><td>lost the pot on a risk</td></tr>
+      <tr><td><code>balancechange</code></td><td><code>{ balance }</code></td><td>balance changed</td></tr>
+    </table>
+    <div class="code">
+      <div class="bar"><span class="lang">JS</span><button class="copy">Copy</button></div>
+<pre>slot.<span class="tok-fn">addEventListener</span>(<span class="tok-str">'bank'</span>, (e) =&gt; {
+  creditWallet(e.detail.amount);   <span class="tok-com">// the player banked this amount</span>
+});</pre>
+    </div>
+
+    <!-- BACKEND -->
+    <h2 id="backend">Server-authoritative outcomes</h2>
+    <div class="callout danger"><b>Use this for anything with real value.</b> Without it, outcomes are decided in the browser (fine for demos, but a player could tamper with them).</div>
+    <p>Provide an async hook and the reels become "dumb" — they only animate to whatever your backend returns:</p>
+    <div class="code">
+      <div class="bar"><span class="lang">JS</span><button class="copy">Copy</button></div>
+<pre>slot.resolveSpin = <span class="tok-kw">async</span> (bet) =&gt; {
+  <span class="tok-kw">const</span> res = <span class="tok-kw">await</span> <span class="tok-fn">fetch</span>(<span class="tok-str">'/api/spin'</span>, {
+    method: <span class="tok-str">'POST'</span>,
+    headers: { <span class="tok-str">'content-type'</span>: <span class="tok-str">'application/json'</span> },
+    body: <span class="tok-fn">JSON.stringify</span>({ bet })
+  }).<span class="tok-fn">then</span>(r =&gt; r.<span class="tok-fn">json</span>());
+
+  <span class="tok-com">// return one symbol index (0..5) per reel:</span>
+  <span class="tok-kw">return</span> { reels: res.reels <span class="tok-com">/*, win: res.win  (optional authoritative payout) */</span> };
+};
+
+<span class="tok-com">// optional: make the RISK gamble server-authoritative too</span>
+slot.resolveRisk = <span class="tok-kw">async</span> (phase, pot) =&gt; ({ won: <span class="tok-kw">await</span> serverDecides() });</pre>
+    </div>
+    <p class="muted">Always debit/credit balances on your server too — treat the component's <code class="inline">balance</code> as display only.</p>
+
+    <!-- CONFIG -->
+    <h2 id="config">Configuration</h2>
+    <p>Set the <code class="inline">config</code> property to customize symbols, payouts, and the bet→phase tiers:</p>
+    <div class="code">
+      <div class="bar"><span class="lang">JS</span><button class="copy">Copy</button></div>
+<pre>slot.config = {
+  currency: <span class="tok-str">'CRD'</span>,
+  reels: <span class="tok-str">4</span>,
+  symbols: [
+    { glyph: <span class="tok-str">'⚡'</span>, color: <span class="tok-str">'#0ff7ff'</span>, value: <span class="tok-str">5</span>,  weight: <span class="tok-str">5</span> },
+    { glyph: <span class="tok-str">'★'</span>, color: <span class="tok-str">'#ffd84d'</span>, value: <span class="tok-str">12</span>, weight: <span class="tok-str">3</span> },
+    { glyph: <span class="tok-str">'7'</span>, color: <span class="tok-str">'#ff4d6d'</span>, value: <span class="tok-str">50</span>, weight: <span class="tok-str">1</span> }
+  ],
+  payouts: { <span class="tok-str">4</span>: <span class="tok-str">1.0</span>, <span class="tok-str">3</span>: <span class="tok-str">0.4</span>, <span class="tok-str">2</span>: <span class="tok-str">0.12</span> }, <span class="tok-com">// win = bet * value * payouts[matchCount]</span>
+  betTiers: [                            <span class="tok-com">// these are the bet buttons AND the phase ceiling</span>
+    { bet: <span class="tok-str">10</span>,  maxPhase: <span class="tok-str">0</span> },          <span class="tok-com">// bet 10 → only Phase 1</span>
+    { bet: <span class="tok-str">100</span>, maxPhase: <span class="tok-str">3</span> }           <span class="tok-com">// bet 100 → unlocks Bonus</span>
+  ],
+  riskOdds: <span class="tok-str">0.5</span>
+};</pre>
+    </div>
+
+    <!-- THEMING -->
+    <h2 id="theming">Theming &amp; sizing</h2>
+    <p>Size it by styling the element; re-color it with CSS variables that pierce the Shadow DOM:</p>
+    <div class="code">
+      <div class="bar"><span class="lang">CSS</span><button class="copy">Copy</button></div>
+<pre>neon-slot {
+  max-width: <span class="tok-str">640px</span>;        <span class="tok-com">/* the game fills its container */</span>
+  --neon: <span class="tok-str">#39ff9c</span>;
+  --gold: <span class="tok-str">#ffffff</span>;
+  --radius: <span class="tok-str">18px</span>;
+}</pre>
+    </div>
+
+    <!-- GO LIVE -->
+    <h2 id="golive">Go live — initialize a player</h2>
+    <p>The component is just the front-end. To play for real value, point it at the live game backend and
+    pass the <b>one required parameter: a <code class="inline">userId</code></b> — the player's id in your
+    wallet system (Liberty hustleback). The backend uses it to read balances, debit bets, and credit wins.</p>
+    <div class="callout"><b>Base URL:</b> <code class="inline">https://game.libertydraw.com/api</code> &nbsp;·&nbsp;
+    <b>You supply:</b> <code class="inline">userId</code> (integer). Everything else (reels, win, balances) comes from the backend.</div>
+    <p>Wire the four hooks once and the whole loop is server-authoritative:</p>
+    <div class="code">
+      <div class="bar"><span class="lang">JS</span><button class="copy">Copy</button></div>
+<pre><span class="tok-kw">const</span> API     = <span class="tok-str">'https://game.libertydraw.com/api'</span>;
+<span class="tok-kw">const</span> USER_ID = <span class="tok-str">'761'</span>;            <span class="tok-com">// ← the player's hustleback id (you provide this)</span>
+<span class="tok-kw">const</span> slot    = document.<span class="tok-fn">querySelector</span>(<span class="tok-str">'neon-slot'</span>);
+<span class="tok-kw">let</span> roundId  = <span class="tok-kw">null</span>;
+
+<span class="tok-kw">const</span> post = (path, body) =&gt;
+  <span class="tok-fn">fetch</span>(API + path, { method:<span class="tok-str">'POST'</span>, headers:{<span class="tok-str">'content-type'</span>:<span class="tok-str">'application/json'</span>}, body:<span class="tok-fn">JSON.stringify</span>(body) })
+    .<span class="tok-fn">then</span>(r =&gt; r.<span class="tok-fn">json</span>());
+
+<span class="tok-com">// 1) SESSION — read the player's authoritative balances</span>
+<span class="tok-kw">const</span> s = <span class="tok-kw">await</span> <span class="tok-fn">post</span>(<span class="tok-str">'/session'</span>, { userId: USER_ID });
+slot.<span class="tok-fn">setBalance</span>(s.balance);        <span class="tok-com">// token (CRD) balance — bets are drawn from this</span>
+<span class="tok-fn">showWallet</span>(s.walletBalance);       <span class="tok-com">// naira wallet — where winnings are paid</span>
+<span class="tok-fn">showTotalWon</span>(s.totalWonNaira);     <span class="tok-com">// cumulative winnings (₦)</span>
+
+<span class="tok-com">// 2) SPIN — server decides the reels and debits the bet (tokens)</span>
+slot.resolveSpin = <span class="tok-kw">async</span> (bet) =&gt; {
+  <span class="tok-kw">const</span> r = <span class="tok-kw">await</span> <span class="tok-fn">post</span>(<span class="tok-str">'/spin'</span>, { userId: USER_ID, bet });
+  roundId = r.roundId;
+  <span class="tok-kw">if</span> (r.balance != <span class="tok-kw">null</span>) slot.<span class="tok-fn">setBalance</span>(r.balance);   <span class="tok-com">// token balance after the debit</span>
+  <span class="tok-kw">return</span> { reels: r.reels, win: r.win };
+};
+
+<span class="tok-com">// 3) RISK — server decides each 50/50 climb (optional gamble ladder)</span>
+slot.resolveRisk = <span class="tok-kw">async</span> () =&gt; {
+  <span class="tok-kw">const</span> r = <span class="tok-kw">await</span> <span class="tok-fn">post</span>(<span class="tok-str">'/risk'</span>, { roundId });
+  <span class="tok-kw">return</span> { won: r.won };
+};
+
+<span class="tok-com">// 4) BANK — server credits the win to the naira wallet</span>
+slot.<span class="tok-fn">addEventListener</span>(<span class="tok-str">'bank'</span>, <span class="tok-kw">async</span> () =&gt; {
+  <span class="tok-kw">const</span> r = <span class="tok-kw">await</span> <span class="tok-fn">post</span>(<span class="tok-str">'/bank'</span>, { roundId });
+  <span class="tok-fn">showWallet</span>(r.walletBalance);        <span class="tok-com">// updated naira wallet</span>
+  <span class="tok-fn">showTotalWon</span>(r.totalWonNaira);      <span class="tok-com">// updated cumulative winnings</span>
+});</pre>
+    </div>
+    <div class="callout warn"><b>Where does <code class="inline">userId</code> come from?</b> It's the player's account id in your
+    backend — issue it server-side when the player opens the game. The component never invents it. (For a private
+    integration you'd also pass a signed session token; ask us to enable <code class="inline">X-Session-Token</code>.)</div>
+
+    <!-- ENDPOINTS -->
+    <h2 id="endpoints">API endpoints</h2>
+    <p>All play endpoints are <code class="inline">POST … application/json</code> against
+    <code class="inline">https://game.libertydraw.com/api</code>. Money timing: the <b>bet is debited on
+    <code class="inline">/spin</code></b>, the <b>win is credited on <code class="inline">/bank</code></b>
+    (the pot is held server-side through the RISK ladder; a bust pays nothing).</p>
+    <table>
+      <tr><th>Method &amp; path</th><th>Body</th><th>Returns</th></tr>
+      <tr><td><code>POST /session</code></td><td><code>{ userId }</code></td>
+        <td><code>balance</code> (tokens), <code>walletBalance</code> (₦), <code>totalWonTokens</code>, <code>totalWonNaira</code>, <code>tokensPerNaira</code>, <code>currency</code>, <code>nonce</code>, <code>serverSeedHash</code>, <code>config</code></td></tr>
+      <tr><td><code>POST /spin</code></td><td><code>{ userId, bet }</code></td>
+        <td><code>roundId</code>, <code>reels</code> (4× index 0–5), <code>count</code>, <code>symbol</code>, <code>win</code>, <code>pot</code>, <code>phase</code>, <code>maxPhase</code>, <code>balance</code> (tokens), <code>nonce</code></td></tr>
+      <tr><td><code>POST /risk</code></td><td><code>{ roundId }</code></td>
+        <td><code>won</code>, <code>phase</code>, <code>pot</code>, <code>atCap</code>, <code>status</code></td></tr>
+      <tr><td><code>POST /bank</code></td><td><code>{ roundId }</code></td>
+        <td><code>amount</code> (tokens won), <code>nairaCredited</code>, <code>walletBalance</code> (₦), <code>balance</code> (tokens), <code>totalWonTokens</code>, <code>totalWonNaira</code></td></tr>
+      <tr><td><code>GET /health</code></td><td><span class="muted">—</span></td><td><code>ok</code>, <code>mock_external</code></td></tr>
+      <tr><td><code>GET /config</code></td><td><span class="muted">—</span></td><td>symbols, payouts, bet tiers, phase multipliers</td></tr>
+    </table>
+    <div class="callout">Bet tiers also set the phase ceiling: <code class="inline">10→Phase 1</code>,
+    <code class="inline">25→Phase 2</code>, <code class="inline">50→Phase 3</code>, <code class="inline">100→Bonus</code>.</div>
+
+    <!-- MONEY MODEL -->
+    <h2 id="money">Tokens &amp; payouts</h2>
+    <p>A player has <b>two balances</b>, and the game moves between them:</p>
+    <table>
+      <tr><th>Balance</th><th>Field</th><th>Role</th></tr>
+      <tr><td><b>Tokens</b> (CRD)</td><td><code>balance</code></td><td>What <b>bets are debited from</b> on every spin.</td></tr>
+      <tr><td><b>Wallet</b> (₦)</td><td><code>walletBalance</code></td><td>Where <b>winnings are paid</b> when the player banks.</td></tr>
+    </table>
+    <div class="callout warn"><b>Conversion: 1 ₦ = 4 tokens.</b> A win pot of <code class="inline">N</code> tokens
+    pays <code class="inline">N ÷ 4</code> naira to the wallet (returned as <code class="inline">nairaCredited</code>).
+    So a 100-token pot banks as ₦25. The token balance is <b>not</b> increased by a win — winnings go to the wallet.</div>
+    <p class="muted"><code class="inline">totalWonNaira</code> is the player's cumulative banked winnings (₦), tracked by the game backend.</p>
+
+    <!-- REACT -->
+    <h2 id="react">React</h2>
+    <p>Custom elements work in React as-is. Use a <code class="inline">ref</code> for properties/events:</p>
+    <div class="code">
+      <div class="bar"><span class="lang">JSX</span><button class="copy">Copy</button></div>
+<pre><span class="tok-kw">import</span> { useEffect, useRef } <span class="tok-kw">from</span> <span class="tok-str">'react'</span>;
+<span class="tok-com">// load once: &lt;script src="https://cdn.jsdelivr.net/gh/dtekluva/neon2@v1/neon-slot.js"&gt; in index.html</span>
+
+<span class="tok-kw">function</span> <span class="tok-fn">Slot</span>() {
+  <span class="tok-kw">const</span> ref = <span class="tok-fn">useRef</span>();
+  <span class="tok-fn">useEffect</span>(() =&gt; {
+    <span class="tok-kw">const</span> el = ref.current;
+    el.resolveSpin = <span class="tok-kw">async</span> (bet) =&gt; <span class="tok-fn">api</span>(bet);
+    <span class="tok-kw">const</span> onWin = (e) =&gt; <span class="tok-fn">addCoins</span>(e.detail.amount);
+    el.<span class="tok-fn">addEventListener</span>(<span class="tok-str">'bank'</span>, onWin);
+    <span class="tok-kw">return</span> () =&gt; el.<span class="tok-fn">removeEventListener</span>(<span class="tok-str">'bank'</span>, onWin);
+  }, []);
+  <span class="tok-kw">return</span> &lt;neon-slot ref={ref} balance=<span class="tok-str">"1000"</span> bet=<span class="tok-str">"25"</span> /&gt;;
+}</pre>
+    </div>
+
+    <!-- VUE -->
+    <h2 id="vue">Vue</h2>
+    <p>Tell Vue it's a custom element, then bind normally:</p>
+    <div class="code">
+      <div class="bar"><span class="lang">JS / Template</span><button class="copy">Copy</button></div>
+<pre><span class="tok-com">// vite.config: compilerOptions.isCustomElement = tag =&gt; tag === 'neon-slot'</span>
+<span class="tok-tag">&lt;neon-slot</span> <span class="tok-attr">ref</span>=<span class="tok-str">"slot"</span> <span class="tok-attr">:balance</span>=<span class="tok-str">"1000"</span> <span class="tok-attr">@win</span>=<span class="tok-str">"onWin"</span> <span class="tok-tag">/&gt;</span></pre>
+    </div>
+
+    <!-- UPDATES -->
+    <h2 id="updates">Updates &amp; versions</h2>
+    <p>Embed the <code class="inline">@v1</code> range and you get our fixes automatically — no code change on your end.</p>
+    <table>
+      <tr><th>URL</th><th>Behaviour</th></tr>
+      <tr><td><code>@v1/neon-slot.js</code></td><td><b>Auto-updates</b> to the newest v1.x.x — recommended</td></tr>
+      <tr><td><code>@v1.0.0/neon-slot.js</code></td><td>Pinned, never changes — maximum stability</td></tr>
+      <tr><td><code>@v1/neon-slot.min.js</code></td><td>Minified (jsDelivr generates it on the fly)</td></tr>
+    </table>
+    <p class="muted">Check the live build anytime: <code class="inline">window.NeonSlot.version</code></p>
+
+    <!-- FAQ -->
+    <h2 id="faq">FAQ</h2>
+    <h3>Will it clash with my site's CSS?</h3>
+    <p>No. The component renders inside a Shadow DOM — its styles are sealed off from your page and vice-versa.</p>
+    <h3>Does the 3D engine need extra setup?</h3>
+    <p>No. With <code class="inline">engine="3d"</code> it loads Three.js from the same CDN automatically.</p>
+    <h3>Can players cheat the outcomes?</h3>
+    <p>Only if you rely on the built-in RNG. Wire <code class="inline">resolveSpin</code> to your backend and the browser can't fabricate wins — it can only request an animation.</p>
+    <h3>Is it mobile-friendly?</h3>
+    <p>Yes — it's responsive and fills its container. Set a <code class="inline">max-width</code> to taste.</p>
+
+    <footer>
+      NEON RUSH · <code class="inline">&lt;neon-slot&gt;</code> v1 · MIT · Full API reference in <code class="inline">embed/README.md</code>.
+    </footer>
+  </main>
+</div>
+
+<!-- the real component, from the CDN -->
+<script src="https://cdn.jsdelivr.net/gh/dtekluva/neon2@v1/neon-slot.js"></script>
+<script>
+  function demo(){ return document.getElementById('demoSlot'); }
+  // copy buttons
+  document.querySelectorAll('.code').forEach(block => {
+    const btn = block.querySelector('.copy'), pre = block.querySelector('pre');
+    btn.addEventListener('click', () => {
+      navigator.clipboard.writeText(pre.innerText).then(() => {
+        btn.textContent = 'Copied ✓'; btn.classList.add('ok');
+        setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('ok'); }, 1500);
+      });
+    });
+  });
+</script>
+</body>
+</html>
